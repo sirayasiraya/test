@@ -1,6 +1,8 @@
 pipeline {
   agent { label 'docker' } 
-
+  environment {
+    imagetag = GIT_COMMIT.take(7)
+  }
   stages{
     stage("build"){
       tools{
@@ -15,7 +17,6 @@ pipeline {
         }
       }
     }
-
     stage("test"){
       tools{
         maven 'maven 3.6.1'  
@@ -29,7 +30,6 @@ pipeline {
         }
       }
     }
-
     stage("packaging"){
       tools{
         maven 'maven 3.6.1'  
@@ -44,23 +44,42 @@ pipeline {
         }
       }
     }
-
-    stage("build-and-push=image"){
+    stage("build-and-push-image"){
       when{
         changeset "**/worker/**"
       }
       steps{
         container('kaniko'){
-          sh 'ls -lah'
-          sh 'cd worker; ls -lah; /kaniko/executor --context `pwd` --verbosity debug --destination harbor7.btech.id/library/worker:main'
+          sh 'ls -lah; env;'
+          sh 'cd worker; ls -lah; /kaniko/executor --context `pwd` --verbosity debug --destination harbor7.btech.id/library/worker:${imagetag}'
         }
       }
     }
 
 
+    stage("deploy-to-prod"){
+      when{
+        changeset "**/worker/**"
+      }
+      steps{
+        container('jnlp'){
+          sshagent(credentials: ['ssh-private-key-lb']) {
+            sh '''
+                echo $imagetag;
+                [ -d ~/.ssh ] || mkdir ~/.ssh && chmod 0700 ~/.ssh
+                ssh-keyscan -t rsa,dsa 10.97.97.11 >> ~/.ssh/known_hosts
+                ssh root@10.97.97.11 ls -lah /root/deploy/worker
+                ssh root@10.97.97.11 "echo ${imagetag}"
+                ssh root@10.97.97.11 "cd /root/deploy/worker; helm upgrade worker . --set image.tag=${imagetag} -n default"
+            '''
+          }
+        }
+      }       
+    }
   }
   post{
     always{
-      echo 'Pipeline Complete'}
+      echo 'Pipeline Complete'
+    }
   }
 }
