@@ -1,0 +1,82 @@
+pipeline {
+  agent { label 'docker' } 
+
+  stages{
+    stage("build"){
+      tools{
+        maven 'maven 3.6.1'  
+      }
+      when{
+        changeset "**/worker/**"
+      }
+      steps{
+        container('jnlp'){
+          sh 'cd worker; mvn compile;'
+        }
+      }
+    }
+    stage("test"){
+      tools{
+        maven 'maven 3.6.1'  
+      }
+      when{
+        changeset "**/worker/**"
+      }
+      steps{
+        container('jnlp'){
+          sh 'cd worker; mvn clean test;'
+        }
+      }
+    }
+    stage("packaging"){
+      tools{
+        maven 'maven 3.6.1'  
+      }
+      when{
+        changeset "**/worker/**"
+      }
+      steps{
+        container('jnlp'){
+          sh 'cd worker; mvn package -DskipTests'
+          archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true
+        }
+      }
+    }
+    stage("build-and-push-image"){
+      when{
+        changeset "**/worker/**"
+      }
+      steps{
+        container('kaniko'){
+          sh 'ls -lah; env;'
+          sh 'cd worker; ls -lah; /kaniko/executor --context `pwd` --verbosity debug --destination harborX.btech.id/library/worker:${ref##*/}'
+        }
+      }
+    }
+
+
+    stage("deploy-to-prod"){
+      when{
+        changeset "**/worker/**"
+      }
+      steps{
+        container('jnlp'){
+          sshagent(credentials: ['ssh-private-key-lb']) {
+            sh '''
+                echo ${ref##*/};
+                [ -d ~/.ssh ] || mkdir ~/.ssh && chmod 0700 ~/.ssh
+                ssh-keyscan -t rsa,dsa 10.99.99.11 >> ~/.ssh/known_hosts
+                ssh root@10.99.99.11 ls -lah /root/deploy/pod0X/worker
+                ssh root@10.99.99.11 "cd /root/deploy/pod0X/worker; helm upgrade  worker . --set image.tag=${ref##*/} -n pod0X"
+            '''
+          }
+        }
+      }       
+    }
+  }
+  post{
+    always{
+      echo 'Pipeline Complete'
+    }
+  }
+}
