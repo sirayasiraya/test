@@ -79,7 +79,7 @@ pipeline {
   }
   post{
     always{
-      echo 'Pipeline Complete Ndes, votedone'
+      echo 'Pipeline Complete'
     }
   }
 }
