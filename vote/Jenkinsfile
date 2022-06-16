@@ -4,46 +4,6 @@ pipeline {
     imagetag = GIT_COMMIT.take(7)
   }
   stages{
-    stage("build"){
-      tools{
-        maven 'maven 3.6.1'  
-      }
-      when{
-        changeset "**/vote/**"
-      }
-      steps{
-        container('jnlp'){
-          sh 'cd vote; mvn compile;'
-        }
-      }
-    }
-    stage("test"){
-      tools{
-        maven 'maven 3.6.1'  
-      }
-      when{
-        changeset "**/vote/**"
-      }
-      steps{
-        container('jnlp'){
-          sh 'cd vote; mvn clean test;'
-        }
-      }
-    }
-    stage("packaging"){
-      tools{
-        maven 'maven 3.6.1'  
-      }
-      when{
-        changeset "**/vote/**"
-      }
-      steps{
-        container('jnlp'){
-          sh 'cd vote; mvn package -DskipTests'
-          archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true
-        }
-      }
-    }
     stage("build-and-push-image"){
       when{
         changeset "**/vote/**"
