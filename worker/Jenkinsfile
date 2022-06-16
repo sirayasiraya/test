@@ -1,48 +1,66 @@
 pipeline {
-  agent { kubernetes 'kubernetes' } 
+  agent { label 'docker' } 
 
-  tools{
-    maven 'maven 3.6.1'  
-  }
   stages{
     stage("build"){
+      tools{
+        maven 'maven 3.6.1'  
+      }
       when{
         changeset "**/worker/**"
       }
       steps{
-        echo 'Compiling worker app'
-        dir('worker'){
-          sh 'env; mvn compile'
+        container('jnlp'){
+          sh 'cd worker; mvn compile;'
         }
       }
     }
+
     stage("test"){
+      tools{
+        maven 'maven 3.6.1'  
+      }
       when{
         changeset "**/worker/**"
       }
       steps{
-        echo 'Compiling worker app'
-        dir('worker'){
-          sh 'mvn clean test'
+        container('jnlp'){
+          sh 'cd worker; mvn clean test;'
         }
       }
     }
-    stage("package"){
+
+    stage("packaging"){
+      tools{
+        maven 'maven 3.6.1'  
+      }
       when{
         changeset "**/worker/**"
       }
       steps{
-        echo 'Compiling worker app'
-        dir('worker'){
-          sh 'mvn package -DskipTests'
-          sh 'ls -lah; ls -lah target'
+        container('jnlp'){
+          sh 'cd worker; mvn package -DskipTests'
           archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true
         }
       }
     }
+
+    stage("build-and-push=image"){
+      when{
+        changeset "**/worker/**"
+      }
+      steps{
+        container('kaniko'){
+          sh 'ls -lah'
+          sh 'cd worker; ls -lah; /kaniko/executor --context `pwd` --verbosity debug --destination harbor7.btech.id/library/worker:main'
+        }
+      }
+    }
+
+
   }
   post{
     always{
-      echo 'Building pipeline for worker is completed..'}
-    }
+      echo 'Pipeline Complete'}
   }
+}
