@@ -20,7 +20,7 @@ pipeline {
       }
       steps{
         container('jnlp'){
-          sshagent(credentials: ['ssh-private-key-lb']) {
+          sshagent(credentials: ['ssh-privkey-lb']) {
             sh '''
                 echo ${ref##*/};
                 [ -d ~/.ssh ] || mkdir ~/.ssh && chmod 0700 ~/.ssh
